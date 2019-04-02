@@ -1,0 +1,2 @@
+search_file took 0.000382 seconds to execute
+store_andfree took 0.001929 seconds to execute

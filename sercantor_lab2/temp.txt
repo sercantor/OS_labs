@@ -1,0 +1,8 @@
+/etc/skel/.config/falkon/profiles/manjaro
+/home/sercantor/.config/manjaro
+/home/sercantor/.config/falkon/profiles/manjaro
+/usr/share/grub/themes/manjaro
+/usr/share/icons/manjaro
+/usr/share/doc/manjaro
+/root/.config/manjaro
+/root/.config/falkon/profiles/manjaro
