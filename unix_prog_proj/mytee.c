@@ -4,12 +4,13 @@
 #include <errno.h>
 #include <unistd.h>
 
+#define MAX_ARG 20
 
 int main(int argc, char* argv[])
 {
-    int fd;
+    int fd[MAX_ARG];
    
-    if (argc < 2) {
+    if(argc < 2) {
 	fprintf(stderr, "Usage: %s [OPTION]... [FILE]...\n", argv[0]);
 	printf("\t-a\tto open in append mode\n");
 	printf("\t-f\tto truncate\n");
@@ -33,21 +34,19 @@ int main(int argc, char* argv[])
 		}
 	    }
     /*
-     * if not, just create normally
+     * if not, just create the files, give them individual fd numbers
      */
     for(int i = 1; i < argc; i++) {
-	fd = open(argv[i], O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR); 
-	    if(fd == -1) {
-		perror("There is error");
+	fd[i] = open(argv[i], O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR); 
+	    if(fd[i] == -1) {
+		perror("cannot open file");
 		exit(1);
 	        }
-	/*
-	 * reading/writing from stdin
-	 */
-        char *buffer = (char *)malloc(700*sizeof(char));
-	read(STDIN_FILENO, buffer, 700);
-	write(fd, buffer, 700);
-	write(STDOUT_FILENO, buffer, 700);
     }
-
+    int nofb; /*use the return value of read to determine when input file is going to end*/
+    for(int i = 0; i < sizeof(fd)/sizeof(fd[0]); i++) {
+	char *buf = (char*)malloc(1000*sizeof(char));
+	nofb = read(STDIN_FILENO, buf, 1000);	
+	write(fd[i], buf, 1000);
+    }
 }
