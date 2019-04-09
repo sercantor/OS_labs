@@ -38,15 +38,20 @@ int main(int argc, char* argv[])
      */
     for(int i = 1; i < argc; i++) {
 	fd[i] = open(argv[i], O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR); 
-	    if(fd[i] == -1) {
-		perror("cannot open file");
-		exit(1);
-	        }
+	if(fd[i] == -1) perror("cannot open file");
     }
-    int nofb; /*use the return value of read to determine when input file is going to end*/
-    for(int i = 0; i < sizeof(fd)/sizeof(fd[0]); i++) {
-	char *buf = (char*)malloc(1000*sizeof(char));
-	nofb = read(STDIN_FILENO, buf, 1000);	
-	write(fd[i], buf, 1000);
+
+    char buf[2048];
+    int bytes_read;
+    while((bytes_read = read(STDIN_FILENO, buf, sizeof(buf)-1)) > 0) {
+    write(STDIN_FILENO,buf, sizeof(buf)-1);
     }
+    
+    /*writing to file*/
+    for(int i = 1; i < argc; i++) write(fd[i],buf, sizeof(buf)-1);
+    
+    /*stdout*/
+    printf("\n%s\n", buf);
+	
+    for(int i = 1; i < sizeof(fd)/sizeof(fd[0]); i++) close(fd[i]);
 }
