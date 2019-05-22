@@ -6,7 +6,11 @@
 
 int main()
 {
-    printf("I am the sender and my PID is: %d\n", getpid());
-    system("kill -s USR1 $(pidof -s reciever)");   
-
+    for( int i = 0; i < 10; i++ ) {
+	printf("I am the sender and my PID is: %d\n", getpid());
+	kill(24403, SIGUSR1);
+	sleep(2);
+    }
+    kill(24403,SIGUSR2);
+    return 0;
 }
