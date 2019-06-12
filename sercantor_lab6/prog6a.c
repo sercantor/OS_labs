@@ -30,16 +30,15 @@ int main(int argc, char *argv[]) {
 	perror("fork");
     }
     else if( pid == 0 ){ /* in child ( write ) */
-	if( close(fd[READ_END]) == -1 ) {
+
+	if( close(fd[READ_END]) == -1 ) { /* close read end because we're not going to use it */
 	    perror("close");
 	}
-	if( write(fd[WRITE_END], argv[1], strlen(argv[1])) != strlen(argv[1]) )	{
+	if( write(fd[WRITE_END], argv[1], strlen(argv[1])) != strlen(argv[1]) )	{ /* write argv[1] */
 	    exit(1);
 	}
 	close(fd[WRITE_END]);
 	wait(NULL);
-
-	
     } else { /* in parent ( listen ) */
 	if( close(fd[WRITE_END]) == -1 ) {
 	    perror("close");
