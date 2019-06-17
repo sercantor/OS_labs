@@ -38,22 +38,20 @@ int main(int argc, char *argv[]) {
 	    exit(1);
 	}
 	close(fd[WRITE_END]);
-	wait(NULL);
+	wait(NULL); /* wait to prevent zombie process */
     } else { /* in parent ( listen ) */
 	if( close(fd[WRITE_END]) == -1 ) {
 	    perror("close");
 	}
-	while( 1 ) {
 	fd_pipe = read(fd[READ_END], buf, BUF_SIZE);
 	if( fd_pipe == -1 ) {
 	    perror("read");
 	}
 	if( fd_pipe == 0 ) {
-	    break;
+	    exit(0);
 	}
 	if (write(STDOUT_FILENO, buf, fd_pipe) != fd_pipe)
 	    exit(1);
-	}
 	write(STDOUT_FILENO, "\n", 1);
 	close(fd[READ_END]);
     }
