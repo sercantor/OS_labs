@@ -1,121 +1,127 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
-#include <fcntl.h>
 
-#define MAX_THREADS 5
-#define BUFFER_SIZE 10
+pthread_t *producers;
+pthread_t *consumers;
 
-sem_t *empty, *full, *mutex;
+sem_t mutex,empty,full;
 
-int buffer[BUFFER_SIZE];
-int in = 0, out = 0;
+int *buf,buf_pos=-1,prod_count,con_count,buf_len;
 
-static volatile int keepRunning = 1;
 
-void intHandler(int dummy) {
-    keepRunning = 0;
+int produce(pthread_t self){
+	int i = 0;
+	int p = 1 + rand()%40;
+	while(!pthread_equal(*(producers+i),self) && i < prod_count){
+		i++;
+	}
+	printf("Producer %d produced %d \n",i+1,p);
+	return p;
 }
 
-void *producer(void * id_ptr) {
-    int ID = *((int *) id_ptr);
-    static int nextProduced = 0;
 
-    while (keepRunning) {
+void consume(int p,pthread_t self){
+	int i = 0;
+	while(!pthread_equal(*(consumers+i),self) && i < con_count){
+		i++;
+	}
 
-        (void) sem_wait(empty);
-        (void) sem_wait(mutex);
-
-       /* Check to see if Overwriting unread slot */
-        if (buffer[in] != -1) {
-            fprintf(stderr, "Synchronization Error: Producer %d Just overwrote %d from Slot %d\n", ID, buffer[in], in);
-            exit(1);
-        }
-
-        nextProduced++; // Producing Integers
-
-        /* Looks like we are OK */
-        buffer[in] = nextProduced;
-        printf("Producer %d. Put %d in slot %d\n", ID, nextProduced, in);
-        in = (in + 1) % BUFFER_SIZE;
-        printf("incremented in!\n");
-
-        (void) sem_post(mutex);
-        (void) sem_post(full);
-    }
-
-    return NULL;
+	printf("Buffer:");
+	for(i=0;i<=buf_pos;++i)
+		printf("%d ",*(buf+i));
+	printf("\nConsumer %d consumed %d \nCurrent buffer len: %d\n",i+1,p,buf_pos);
+	
 }
 
-void *consumer (void *id_ptr) {
-    int ID = *((int *) id_ptr);
-    static int nextConsumed = 0;
 
-    while (keepRunning) {
+void* producer(void *args){
 
-        (void) sem_wait(full);
-        (void) sem_wait(mutex);
-
-        nextConsumed = buffer[out];
-
-        /* Check to make sure we did not read from an empty slot */
-        if (nextConsumed == -1) {
-            fprintf(stderr, "Synch Error: Consumer %d Just Read from empty slot %d\n", ID, out);
-            exit(1);
-        }
-
-        /* We must be OK */
-        printf("Consumer %d Just consumed item %d from slot %d\n", ID, nextConsumed, out);
-        buffer[out] = -1;
-        out = (out + 1) % BUFFER_SIZE;
-        printf("incremented out!\n");
-
-        (void) sem_post(mutex);
-        (void) sem_post(empty);
-    }
-
-    return NULL;
+	while(1){
+		int p = produce(pthread_self());
+		sem_wait(&empty);
+		sem_wait(&mutex);
+		++buf_pos;			// critical section
+		*(buf + buf_pos) = p; 
+		sem_post(&mutex);
+		sem_post(&full);
+		sleep(1 + rand()%3);
+	}
+	
+	return NULL;
 }
 
-int main() {
-    int ID[MAX_THREADS];
-    pthread_t TID[MAX_THREADS];
 
-    empty = sem_open("/empty", O_CREAT, 0644, 10);
-    full = sem_open("/full", O_CREAT, 0644, 0);
-    mutex = sem_open("/mutex", O_CREAT, 0644, 1);
+void* consumer(void *args){
+	int c;
+	while(1){
+		sem_wait(&full);
+		sem_wait(&mutex);
+		c = *(buf+buf_pos);
+		consume(c,pthread_self());
+		--buf_pos;
+		sem_post(&mutex);
+		sem_post(&empty);
+		sleep(1+rand()%5);
+	}
 
-    signal(SIGINT, intHandler);
-
-    for (int i = 0; i < MAX_THREADS; i++) {
-        ID[i] = i;
-    }
-
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        buffer[i] = -1;
-    }
-
-    pthread_create(&TID[0], NULL, producer, (void *) &ID[0]);
-    printf("Producer ID = %d created!\n", 0);
-    sleep(1);
-    pthread_create(&TID[1], NULL, consumer, (void *) &ID[1]);
-    printf("Consumer ID = %d created!\n", 1);
-
-    pthread_create(&TID[2], NULL, producer, (void *) &ID[2]);
-    printf("Producer ID = %d created!\n", 2);
-    pthread_create(&TID[3], NULL, consumer, (void *) &ID[3]);
-    printf("Consumer ID = %d created!\n", 3);
-
-    for (int i = 0; i < 4; i++) {
-        pthread_join(TID[i], NULL);
-    }
-
-    (void) sem_unlink("/empty");
-    (void) sem_unlink("/full");
-    (void) sem_unlink("/mutex");
-
-    return 0;
+	return NULL;
 }
+
+int main(void){
+	
+	int i,err;
+
+	srand(time(NULL));
+
+	sem_init(&mutex,0,1);
+	sem_init(&full,0,0);
+
+	printf("Enter the number of Producers:");
+	scanf("%d",&prod_count);
+	producers = (pthread_t*) malloc(prod_count*sizeof(pthread_t));
+
+	printf("Enter the number of Consumers:");
+	scanf("%d",&con_count);
+	consumers = (pthread_t*) malloc(con_count*sizeof(pthread_t));
+
+	printf("Enter buffer capacity:");
+	scanf("%d",&buf_len);
+	buf = (int*) malloc(buf_len*sizeof(int));
+
+	sem_init(&empty,0,buf_len);
+
+	for(i=0;i<prod_count;i++){
+		err = pthread_create(producers+i,NULL,&producer,NULL);
+		if(err != 0){
+			printf("Error creating producer %d: %s\n",i+1,strerror(err));
+		}else{
+			printf("Successfully created producer %d\n",i+1);
+		}
+	}
+
+	for(i=0;i<con_count;i++){
+		err = pthread_create(consumers+i,NULL,&consumer,NULL);
+		if(err != 0){
+			printf("Error creating consumer %d: %s\n",i+1,strerror(err));
+		}else{
+			printf("Successfully created consumer %d\n",i+1);
+		}
+	}
+
+	for(i=0;i<prod_count;i++){
+		pthread_join(*(producers+i),NULL);
+	}
+	for(i=0;i<con_count;i++){
+		pthread_join(*(consumers+i),NULL);
+	}
+
+
+	return 0;
+}
+
+
